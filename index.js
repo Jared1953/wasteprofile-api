@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const Anthropic = require("@anthropic-ai/sdk");
-
+const client = new Anthropic({ apiKey: "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" });
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
