@@ -1,12 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const Anthropic = require("@anthropic-ai/sdk");
-const client = new Anthropic({ apiKey: "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" });
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 app.get("/", (req, res) => res.json({ status: "WasteProfile OS API running" }));
 
@@ -14,77 +12,24 @@ app.post("/extract-pdf", async (req, res) => {
   try {
     const { base64, filename } = req.body;
     if (!base64) return res.status(400).json({ error: "No file provided" });
-
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) return res.status(500).json({ error: "API key not configured on server" });
+    const client = new Anthropic({ apiKey: key });
     const response = await client.messages.create({
       model: "claude-opus-4-5",
       max_tokens: 2000,
       messages: [{
         role: "user",
         content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data: base64 }
-          },
-          {
-            type: "text",
-            text: `You are a hazardous waste compliance specialist. Extract ALL profile information from this waste profile document and return ONLY a JSON object with no markdown or explanation.
-
-Return this exact structure (use empty string if field not found):
-{
-  "profileNumber": "",
-  "generatedDate": "",
-  "expirationDate": "",
-  "status": "Active",
-  "generator": {
-    "name": "",
-    "contact": "",
-    "email": "",
-    "phone": "",
-    "address": "",
-    "epaId": "",
-    "naicsCode": ""
-  },
-  "facility": {
-    "name": "",
-    "address": "",
-    "epaId": ""
-  },
-  "wasteCharacterization": {
-    "wasteName": "",
-    "processGenerating": "",
-    "wasteCode": "",
-    "rcraHazardous": false,
-    "hazardousCodes": [],
-    "physicalState": "",
-    "color": "",
-    "odor": "",
-    "ph": "",
-    "flashPoint": "",
-    "containerType": "",
-    "containerSize": "",
-    "estimatedAnnualQuantity": ""
-  },
-  "regulatoryInfo": {
-    "dotProperShippingName": "",
-    "dotHazardClass": "",
-    "unNumber": "",
-    "packagingGroup": ""
-  },
-  "approvalConditions": [],
-  "specialHandlingInstructions": "",
-  "certificationStatement": ""
-}`
-          }
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+          { type: "text", text: `Extract ALL profile information from this hazardous waste profile document. Return ONLY JSON with no markdown:\n{"profileNumber":"","generatedDate":"","expirationDate":"","status":"Active","generator":{"name":"","contact":"","email":"","phone":"","address":"","epaId":"","naicsCode":""},"facility":{"name":"","address":"","epaId":""},"wasteCharacterization":{"wasteName":"","processGenerating":"","wasteCode":"","rcraHazardous":false,"hazardousCodes":[],"physicalState":"","color":"","odor":"","ph":"","flashPoint":"","containerType":"","containerSize":"","estimatedAnnualQuantity":""},"regulatoryInfo":{"dotProperShippingName":"","dotHazardClass":"","unNumber":"","packagingGroup":""},"approvalConditions":[],"specialHandlingInstructions":"","certificationStatement":""}` }
         ]
       }]
     });
-
-    const text = response.content[0].text;
-    const clean = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(clean);
-    res.json({ success: true, data: parsed });
+    const clean = response.content[0].text.replace(/```json|```/g, "").trim();
+    res.json({ success: true, data: JSON.parse(clean) });
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -92,13 +37,15 @@ Return this exact structure (use empty string if field not found):
 app.post("/generate-profile", async (req, res) => {
   try {
     const { prompt } = req.body;
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) return res.status(500).json({ error: "API key not configured on server" });
+    const client = new Anthropic({ apiKey: key });
     const response = await client.messages.create({
       model: "claude-opus-4-5",
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }]
     });
-    const text = response.content[0].text;
-    const clean = text.replace(/```json|```/g, "").trim();
+    const clean = response.content[0].text.replace(/```json|```/g, "").trim();
     res.json({ success: true, text: clean });
   } catch (err) {
     res.status(500).json({ error: err.message });
